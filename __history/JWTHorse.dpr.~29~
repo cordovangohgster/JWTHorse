@@ -1,0 +1,101 @@
+program JWTHorse;
+
+{$APPTYPE CONSOLE}
+
+{$R *.res}
+
+uses
+  JOSE.Core.JWT,
+  JOSE.Core.Builder,
+  System.SysUtils,
+  Horse,
+  JOSE.Core.JWS,
+  JOSE.Core.JWK;
+  JOSE.Core.TJOSEAlgorithmId;
+
+
+var
+  LToken: TJWT;
+  LCompactToken: string;
+begin
+  // Forma básica de obtención de token
+  THorse.Get('/GetToken',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    var
+    LToken: TJWT;
+    LCompactToken: string;
+    begin
+      LToken := TJWT.Create;
+      try
+        // Token claims
+        LToken.Claims.Issuer := 'Software House';
+        LToken.Claims.Subject := 'Jesus Cordova ';
+        LToken.Claims.Expiration := Now + 1;
+
+        //Other claims
+        LToken.Claims.SetClaimOfType<string>('nombre', 'Jesús Córdova');
+        LToken.Claims.SetClaimOfType<boolean>('mvp', True);
+
+        // Signing and Compact format creation
+        LCompactToken := TJOSE.SHA256CompactToken('key', LToken);
+        Res.Send(LCompactToken);
+      finally
+        LToken.Free;
+      end;
+    end);
+
+  //tener mayor control sobre la creación y control del token
+  THorse.Get('/GetFullToken',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    var
+      LToken: TJWT;
+      LSigner: TJWS;
+      LKey: TJWK;
+      LAlg: TJOSEAlgorithmId;
+    begin
+      LToken := TJWT.Create;
+      try
+        // Set your claims
+        LToken.Claims.Subject := 'Paolo Rossi';
+        LToken.Claims.Issuer := 'Delphi JOSE Library';
+        LToken.Claims.IssuedAt := Now;
+        LToken.Claims.Expiration := Now + 1;
+
+        // Choose the signing algorithm
+        case cbbAlgorithm.ItemIndex of
+          0: LAlg := TJOSEAlgorithmId.HS256;
+          1: LAlg := TJOSEAlgorithmId.HS384;
+          2: LAlg := TJOSEAlgorithmId.HS512;
+        else LAlg := TJOSEAlgorithmId.HS256;
+        end;
+
+        // Create your key from any text or TBytes
+        LKey := TJWK.Create(edtSecret.Text);
+
+        try
+          // Create the signer
+          LSigner := TJWS.Create(LToken);
+          try
+            // With this option you can have keys < algorithm length
+            LSigner.SkipKeyValidation := True;
+
+            // Sign the token!
+            LSigner.Sign(LKey, LAlg);
+
+            memoCompact.Lines.Add('Header: ' + LSigner.Header);
+            memoCompact.Lines.Add('Payload: ' + LSigner.Payload);
+            memoCompact.Lines.Add('Signature: ' + LSigner.Signature);
+            memoCompact.Lines.Add('Compact Token: ' + LSigner.CompactToken);
+          finally
+            LSigner.Free;
+          end;
+        finally
+          LKey.Free;
+        end;
+      finally
+        LToken.Free;
+      end;
+    end);
+
+  THorse.Listen(9000);
+end.

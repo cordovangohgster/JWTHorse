@@ -1,0 +1,45 @@
+program JWTHorse;
+{Construido de: https://github.com/paolo-rossi/delphi-jose-jwt }
+
+{$APPTYPE CONSOLE}
+
+{$R *.res}
+
+uses
+  JOSE.Core.JWT,
+  JOSE.Core.Builder,
+  System.SysUtils,
+  Horse;
+
+var
+  LToken: TJWT;
+  LCompactToken: string;
+begin
+  // Forma básica de obtención de token
+  THorse.Get('/GetToken',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    var
+    LToken: TJWT;
+    LCompactToken: string;
+    begin
+      LToken := TJWT.Create;
+      try
+        // Token claims
+        LToken.Claims.Issuer := 'Software House LTDA';
+        LToken.Claims.Subject := 'Jesus Cordova ';
+        LToken.Claims.Expiration := Now + 1;
+
+        //Other claims
+        LToken.Claims.SetClaimOfType<string>('nombre', 'Jesús Córdova');
+        LToken.Claims.SetClaimOfType<boolean>('mvp', True);
+
+        // Signing and Compact format creation
+        LCompactToken := TJOSE.SHA256CompactToken('key', LToken);
+        Res.Send(LCompactToken);
+      finally
+        LToken.Free;
+      end;
+    end);
+
+  THorse.Listen(9000);
+end.
